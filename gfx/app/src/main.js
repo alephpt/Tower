@@ -2,13 +2,13 @@ import App from './App.svelte';
 import init from '../../pkg/index.js';
 
 init().then(() => {
-	console.log('init done');
+	console.log('WGPU Loaded!');
 });
 
 const app = new App({
 	target: document.body,
 	props: {
-		words: 'PROPS!',
+		words: 'Svelte is running!',
 	},
 
 });
