@@ -1,0 +1,25 @@
+[package]
+name = "tower_assault"
+version = "0.1.0"
+edition = "2021"
+authors = ["Richard I. Christopher"]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+resolver = "2"
+
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 3
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+amethyst = "0.15.3"
+
+[[example]]
+name = "test"
+
