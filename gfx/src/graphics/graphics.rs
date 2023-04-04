@@ -137,11 +137,39 @@ impl Graphics {
         WindowBuilder::new().build(event_loop).unwrap()
     }
 
-    pub fn input(&mut self, event: &WindowEvent) -> bool {
-        false
+    pub fn input(&mut self, event: &WindowEvent) {
+        if let WindowEvent::CursorMoved { position, .. } = event {
+            self.mouse_state.mouse_position = *position;
+        }
+
+        if let WindowEvent::MouseInput { state, button, .. } = event {
+            match button {
+                MouseButton::Left => {
+                    self.mouse_state.l_mouse_down = match state {
+                        ElementState::Pressed => true,
+                        ElementState::Released => false,
+                    };
+                },
+                MouseButton::Middle => {
+                    self.mouse_state.m_mouse_down = match state {
+                        ElementState::Pressed => true,
+                        ElementState::Released => false,
+                    };
+                },
+                MouseButton::Right => {
+                    self.mouse_state.r_mouse_down = match state {
+                        ElementState::Pressed => true,
+                        ElementState::Released => false,
+                    };
+                },
+                _ => {}
+            }
+        }
     }
 
-    pub fn update(&mut self) {}
+    pub fn update(&mut self) {
+
+    }
 
     pub fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
         self.size = new_size;
@@ -151,6 +179,32 @@ impl Graphics {
     }
 
     pub fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
+        let output = self.surface.get_current_texture()?;
+        let view = output.texture.create_view(&wgpu::TextureViewDescriptor::default());
+        let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+            label: Some("Render Encoder"),
+        });
+
+        {
+            let _render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("Render Pass"),
+                color_attachments: &[
+                    Some(wgpu::RenderPassColorAttachment {
+                        view: &view,
+                        resolve_target: None,
+                        ops: wgpu::Operations {
+                            load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                            store: true,
+                        },
+                    })
+                ],
+                depth_stencil_attachment: None,
+            });
+        }
+
+        self.queue.submit(std::iter::once(encoder.finish()));
+        output.present();
+
         Ok(())
     }
 
@@ -181,32 +235,9 @@ impl Graphics {
                     WindowEvent::ScaleFactorChanged { new_inner_size, .. } => {
                         graphics.resize(**new_inner_size);
                     },
-                    WindowEvent::CursorMoved { position, .. } => {
-                        graphics.mouse_state.mouse_position = *position;
+                    WindowEvent::MouseInput { .. } | WindowEvent::CursorMoved { .. } => {
+                        graphics.input(event);
                     },
-                    WindowEvent::MouseInput { state, button, .. } => {
-                        match (state, button) {
-                            (ElementState::Pressed, MouseButton::Left) => {
-                                graphics.mouse_state.l_mouse_down = true;
-                            }
-                            (ElementState::Released, MouseButton::Left) => {
-                                graphics.mouse_state.l_mouse_down = false;
-                            }
-                            (ElementState::Pressed, MouseButton::Right) => {
-                                graphics.mouse_state.m_mouse_down = true;
-                            }
-                            (ElementState::Released, MouseButton::Right) => {
-                                graphics.mouse_state.m_mouse_down = false;
-                            }
-                            (ElementState::Pressed, MouseButton::Middle) => {
-                                graphics.mouse_state.r_mouse_down = true;
-                            }
-                            (ElementState::Released, MouseButton::Middle) => {
-                                graphics.mouse_state.r_mouse_down = false;
-                            }
-                            _ => {}
-                        }
-                    }
                     _ => {}
                 }
             },
