@@ -5,7 +5,7 @@
 
 <main>
 	<h1>{words}!</h1>
-	<button on:click={() => wasm()}>Run</button>
+	<canvas id=""canvas></canvas>
 </main>
 
 <style>

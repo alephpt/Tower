@@ -48,7 +48,7 @@ impl Graphics {
             // Winit prevents sizing with CSS, so we have to set
             // the size manually when on web.
             use winit::dpi::PhysicalSize;
-            window.set_inner_size(PhysicalSize::new(WINDOW_WIDTH, WINDOW_HEIGHT));
+            window.set_inner_size(PhysicalSize::new(450, 600));
             
             use winit::platform::web::WindowExtWebSys;
             web_sys::window()
@@ -78,11 +78,13 @@ impl Graphics {
         let surface = unsafe { instance.create_surface(&window) }.unwrap();
 
         // get the wgpu adapter
-        let adapter = instance.enumerate_adapters(wgpu::Backends::all())
-                              .filter(|adapter| {
-                                  adapter.is_surface_supported(&surface)
-                              })
-                              .next().unwrap();
+        let adapter = instance.request_adapter(
+                                    &wgpu::RequestAdapterOptions {
+                                        power_preference: wgpu::PowerPreference::default(),
+                                        compatible_surface: Some(&surface),
+                                        force_fallback_adapter: false,
+                                    },
+                                ).await.unwrap();
         
         // create the wgpu device and queue
         let (device, queue) = adapter.request_device(

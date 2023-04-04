@@ -9,6 +9,8 @@
     <style>
         canvas {
             background-color: black;
+            padding: 25ch;
+            margin: 25ch;
         }
     </style>
 </head>
@@ -16,20 +18,13 @@
 <body id="wasm-example">
   <script type="module">
       import init from "./pkg/gfx.js";
-      init().then(() => {
-          console.log("WASM Loaded");
-      });
+      
+      wasm.init().then(() => {
+          console.log("WASM loaded");
+      })
   </script>
-  <script>
-    let word = "Hello World";
-  </script>
-  
-  <h1>{word}</h1>
-
+  <canvas id=""canvas>
+  </canvas>
 </body>
 
 </html>
-
- 
-
- 
