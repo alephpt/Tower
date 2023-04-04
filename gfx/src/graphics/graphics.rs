@@ -28,6 +28,9 @@ pub struct Graphics {
 
 impl Graphics {
     pub async fn new(window: Window) -> Self {
+        const WINDOW_HEIGHT: u32 = 1200;
+        const WINDOW_WIDTH: u32 = 1600;
+        
         // Initialize logger
         cfg_if::cfg_if! {
             if #[cfg(target_arch = "wasm32")] {
@@ -44,7 +47,7 @@ impl Graphics {
             // Winit prevents sizing with CSS, so we have to set
             // the size manually when on web.
             use winit::dpi::PhysicalSize;
-            window.set_inner_size(PhysicalSize::new(450, 400));
+            window.set_inner_size(PhysicalSize::new(WINDOW_WIDTH, WINDOW_HEIGHT));
             
             use winit::platform::web::WindowExtWebSys;
             web_sys::window()
@@ -58,6 +61,9 @@ impl Graphics {
                 .expect("Couldn't append canvas to document body.");
         }
         
+        // set the window size
+        window.set_inner_size(winit::dpi::PhysicalSize::new(WINDOW_WIDTH, WINDOW_HEIGHT));
+
         // get the window size
         let size = window.inner_size();
 
@@ -217,7 +223,7 @@ impl Graphics {
             Event::WindowEvent {
                 ref event,
                 window_id,
-            } if window_id == graphics.window.id() => if !graphics.input(event) { // UPDATED!
+            } if window_id == graphics.window.id() => { // UPDATED!
                 match event {
                     WindowEvent::CloseRequested
                     | WindowEvent::KeyboardInput {
