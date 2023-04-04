@@ -1,9 +1,5 @@
 import App from './App.svelte';
-import init from '../../pkg/pkg.js';
-
-//init().then(() => {
-//	console.log('WGPU Loaded!');
-//});
+import init from '../../pkg/gfx.js';
 
 const app = new App({
 	target: document.body,

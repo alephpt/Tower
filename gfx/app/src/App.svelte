@@ -5,8 +5,7 @@
 
 <main>
 	<h1>{words}!</h1>
-	// run wasm
-	<button on:click={() => wasm.run()}>Run</button>
+	<button on:click={() => wasm()}>Run</button>
 </main>
 
 <style>
