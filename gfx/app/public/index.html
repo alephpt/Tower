@@ -11,17 +11,15 @@
 	<link rel='stylesheet' href='/build/bundle.css'>
 
 	<script defer src='/build/bundle.js'></script>
-	<style>
-		canvas {
-			background-color: black;
-			width: 50%;
-			height: 50%;
-			margin: 10px;
-		}
-	</style>
 </head>
 
-<body>
+<body id="gfx">
+	<script type="module">
+		import init from '../../../pkg/gfx.js';
+
+		init().then(() => console.log("WASM Loaded"));
+	</script>
+</body>	
 	
 </body>
 </html>

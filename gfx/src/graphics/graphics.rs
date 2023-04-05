@@ -7,6 +7,8 @@ use winit::{
     window::{WindowBuilder, Window},
 };
 
+use winit::platform::web::WindowExtWebSys;
+
 #[derive(Debug)]
 pub struct Mouse {
     pub mouse_position: winit::dpi::PhysicalPosition<f64>,
@@ -50,11 +52,10 @@ impl Graphics {
             use winit::dpi::PhysicalSize;
             window.set_inner_size(PhysicalSize::new(450, 600));
             
-            use winit::platform::web::WindowExtWebSys;
             web_sys::window()
                 .and_then(|win| win.document())
                 .and_then(|doc| {
-                    let dst = doc.get_element_by_id("wasm-example")?;
+                    let dst = doc.get_element_by_id("gfx")?;
                     let canvas = web_sys::Element::from(window.canvas());
                     dst.append_child(&canvas).ok()?;
                     Some(())
@@ -202,6 +203,11 @@ impl Graphics {
     pub fn input(&mut self, event: &WindowEvent) {
         if let WindowEvent::CursorMoved { position, .. } = event {
             self.mouse_state.mouse_position = *position;
+            // if wasm then console.log
+            #[cfg(target_arch = "wasm32")]
+            {
+                web_sys::console::log_1(&format!("Mouse position: {:?}", self.mouse_state.mouse_position).into());
+            }
         }
 
         if let WindowEvent::MouseInput { state, button, .. } = event {
@@ -211,18 +217,36 @@ impl Graphics {
                         ElementState::Pressed => true,
                         ElementState::Released => false,
                     };
+                    println!("Left mouse button pressed: {}", self.mouse_state.l_mouse_down);
+                    // if wasm then console.log
+                    #[cfg(target_arch = "wasm32")]
+                    {
+                        web_sys::console::log_1(&"Left mouse button pressed".into());
+                    }
                 },
                 MouseButton::Middle => {
                     self.mouse_state.m_mouse_down = match state {
                         ElementState::Pressed => true,
                         ElementState::Released => false,
                     };
+                    println!("Middle mouse button pressed: {}", self.mouse_state.m_mouse_down);
+                    // if wasm then console.log
+                    #[cfg(target_arch = "wasm32")]
+                    {
+                        web_sys::console::log_1(&"Middle mouse button pressed".into());
+                    }
                 },
                 MouseButton::Right => {
                     self.mouse_state.r_mouse_down = match state {
                         ElementState::Pressed => true,
                         ElementState::Released => false,
                     };
+                    println!("Right mouse button pressed: {}", self.mouse_state.r_mouse_down);
+                    // if wasm then console.log
+                    #[cfg(target_arch = "wasm32")]
+                    {
+                        web_sys::console::log_1(&"Right mouse button pressed".into());
+                    }
                 },
                 _ => {}
             }
@@ -238,6 +262,12 @@ impl Graphics {
         self.config.width = new_size.width;
         self.config.height = new_size.height;
         self.surface.configure(&self.device, &self.config);
+        
+        // allows for resize if using wasm in the browser
+        #[cfg(target_arch = "wasm32")]
+        {
+            web_sys::console::log_1(&format!("Resized to: {:?}", self.size).into());
+        }
     }
 
     pub fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
@@ -272,53 +302,54 @@ impl Graphics {
 
         Ok(())
     }
+}
 
-    pub async fn run() -> Result<(), wgpu::SurfaceError> {
-        let event_loop = EventLoop::new();
-        let window = Graphics::new_window(&event_loop);
-        let mut graphics = Graphics::new(window).await;
+#[cfg_attr(target_arch="wasm32", wasm_bindgen(start))]
+pub async fn run() {
+    let event_loop = EventLoop::new();
+    let window = Graphics::new_window(&event_loop);
+    let mut graphics = Graphics::new(window).await;
 
-        event_loop.run(move |event, _, control_flow| match event {
-            Event::WindowEvent {
-                ref event,
-                window_id,
-            } if window_id == graphics.window.id() => { // UPDATED!
-                match event {
-                    WindowEvent::CloseRequested
-                    | WindowEvent::KeyboardInput {
-                        input:
-                            KeyboardInput {
-                                state: ElementState::Pressed,
-                                virtual_keycode: Some(VirtualKeyCode::Escape),
-                                ..
-                            },
-                        ..
-                    } => *control_flow = ControlFlow::Exit,
-                    WindowEvent::Resized(physical_size) => {
-                        graphics.resize(*physical_size);
-                    },
-                    WindowEvent::ScaleFactorChanged { new_inner_size, .. } => {
-                        graphics.resize(**new_inner_size);
-                    },
-                    WindowEvent::MouseInput { .. } | WindowEvent::CursorMoved { .. } => {
-                        graphics.input(event);
-                    },
-                    _ => {}
-                }
-            },
-            Event::RedrawRequested(_) => {
-                graphics.update();
-                match graphics.render() {
-                    Ok(_) => {},
-                    Err(wgpu::SurfaceError::Lost) => graphics.resize(graphics.size),
-                    Err(wgpu::SurfaceError::OutOfMemory) => *control_flow = ControlFlow::Exit,
-                    Err(e) => eprintln!("{:?}", e),
-                }
-            },
-            Event::MainEventsCleared => {
-                graphics.window.request_redraw();
-            },
-            _ => {}
-        });
-    }
+    event_loop.run(move |event, _, control_flow| match event {
+        Event::WindowEvent {
+            ref event,
+            window_id,
+        } if window_id == graphics.window.id() => { // UPDATED!
+            match event {
+                WindowEvent::CloseRequested
+                | WindowEvent::KeyboardInput {
+                    input:
+                        KeyboardInput {
+                            state: ElementState::Pressed,
+                            virtual_keycode: Some(VirtualKeyCode::Escape),
+                            ..
+                        },
+                    ..
+                } => *control_flow = ControlFlow::Exit,
+                WindowEvent::Resized(physical_size) => {
+                    graphics.resize(*physical_size);
+                },
+                WindowEvent::ScaleFactorChanged { new_inner_size, .. } => {
+                    graphics.resize(**new_inner_size);
+                },
+                WindowEvent::MouseInput { .. } | WindowEvent::CursorMoved { .. } => {
+                    graphics.input(event);
+                },
+                _ => {}
+            }
+        },
+        Event::RedrawRequested(_) => {
+            graphics.update();
+            match graphics.render() {
+                Ok(_) => {},
+                Err(wgpu::SurfaceError::Lost) => graphics.resize(graphics.size),
+                Err(wgpu::SurfaceError::OutOfMemory) => *control_flow = ControlFlow::Exit,
+                Err(e) => eprintln!("{:?}", e),
+            }
+        },
+        Event::MainEventsCleared => {
+            graphics.window.request_redraw();
+        },
+        _ => {}
+    });
 }

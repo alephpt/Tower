@@ -1,11 +1,9 @@
 <script>
 	export let words;
-	export let wasm;
 </script>
 
-<main>
+<main id="gfx">
 	<h1>{words}!</h1>
-	<canvas id=""canvas></canvas>
 </main>
 
 <style>
