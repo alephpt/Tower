@@ -1,16 +1,19 @@
-#[cfg(target_arch="wasm32")]
-use wasm_bindgen::prelude::*;
 
+use wgpu::util::DeviceExt;
 use winit::{
     event::*,
     event_loop::{ControlFlow, EventLoop},
     window::{WindowBuilder, Window},
 };
+use crate::graphics::Vertex;
+use crate::graphics::Position;
+use crate::graphics::Cube;
 
 
 #[derive(Debug)]
 pub struct Mouse {
     pub mouse_position: winit::dpi::PhysicalPosition<f64>,
+    pub prev_mouse_position: winit::dpi::PhysicalPosition<f64>,
     pub l_mouse_down: bool,
     pub m_mouse_down: bool,
     pub r_mouse_down: bool,
@@ -22,17 +25,24 @@ pub struct Graphics {
     pub surface: wgpu::Surface,
     pub device: wgpu::Device,
     pub render_pipeline: wgpu::RenderPipeline,
+    pub vertex_buffer: wgpu::Buffer,
+    pub index_buffer: wgpu::Buffer,
     pub queue: wgpu::Queue,
     pub config: wgpu::SurfaceConfiguration,
     pub size: winit::dpi::PhysicalSize<u32>,
     pub mouse_state: Mouse,
+    pub cube: Cube,
+    pub n_vertices: u32,
+    pub n_indices: u32,
 }
 
 impl Graphics {
-    pub async fn new(window: Window) -> Self {
+    pub async fn new(window: Window, cube: Cube) -> Self {
         const WINDOW_HEIGHT: u32 = 1200;
         const WINDOW_WIDTH: u32 = 1600;
-        
+        let n_vertices: u32 = cube.mesh.vertices.len() as u32;
+        let n_indices = cube.mesh.indices.len() as u32;
+
         // Initialize logger
         cfg_if::cfg_if! {
             if #[cfg(target_arch = "wasm32")] {
@@ -51,6 +61,7 @@ impl Graphics {
             use winit::dpi::PhysicalSize;
             use winit::platform::web::WindowExtWebSys;
 
+
             window.set_inner_size(PhysicalSize::new(450, 600));
             
             web_sys::window()
@@ -58,7 +69,6 @@ impl Graphics {
                 .and_then(|doc| {
                     let dst = doc.get_element_by_id("gfx")?;
                     let canvas = web_sys::Element::from(window.canvas());
-
                     dst.append_child(&canvas).ok()?;
                     Some(())
                 })
@@ -137,13 +147,14 @@ impl Graphics {
             push_constant_ranges: &[],
         });
      
+        // create the wgpu render pipeline for our shader
         let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("Render Pipeline"),
             layout: Some(&render_pipeline_layout),
             vertex: wgpu::VertexState {
                 module: &shader,
                 entry_point: "vertex_main", 
-                buffers: &[], 
+                buffers: &[Vertex::desc(),], 
             },
             fragment: Some(wgpu::FragmentState { 
                 module: &shader,
@@ -175,12 +186,31 @@ impl Graphics {
             multiview: None, 
         });
 
+        // create the vertex buffer that will be used to draw our shapes
+        let vertex_buffer = device.create_buffer_init(
+            &wgpu::util::BufferInitDescriptor {
+                label: Some("Vertex Buffer"),
+                contents: bytemuck::cast_slice(&cube.mesh.vertices),
+                usage: wgpu::BufferUsages::VERTEX,
+            }
+        );
+
+        // create the index buffer that will be used to draw our shapes
+        let index_buffer = device.create_buffer_init(
+            &wgpu::util::BufferInitDescriptor {
+                label: Some("Index Buffer"),
+                contents: bytemuck::cast_slice(&cube.mesh.indices),
+                usage: wgpu::BufferUsages::INDEX,
+            }
+        );
+
         // configure the surface
         surface.configure(&device, &config);
         
         // create the mouse state
         let mouse_state = Mouse {
             mouse_position: winit::dpi::PhysicalPosition::new(0.0, 0.0),
+            prev_mouse_position: winit::dpi::PhysicalPosition::new(0.0, 0.0),
             l_mouse_down: false,
             m_mouse_down: false,
             r_mouse_down: false,
@@ -191,10 +221,15 @@ impl Graphics {
             surface,
             device,
             render_pipeline,
+            vertex_buffer,
+            index_buffer,
             queue,
             config,
             size,
-            mouse_state
+            mouse_state,
+            cube,
+            n_vertices,
+            n_indices,
         }
     }
 
@@ -256,7 +291,57 @@ impl Graphics {
     }
 
     pub fn update(&mut self) {
+        let current_mouse_pos = self.mouse_state.mouse_position;
 
+        // if the mouse button is pushed down
+        if self.mouse_state.l_mouse_down {
+
+            // calculate dx and dy
+            let dx = (current_mouse_pos.x - self.mouse_state.prev_mouse_position.x) as f32;
+            let dy = (current_mouse_pos.y - self.mouse_state.prev_mouse_position.y) as f32;
+
+            // check if dx and dy are 0
+            if dx == 0.0 && dy == 0.0 {
+                return;
+            }
+
+            // find the normalized direction of the mouse movement
+            let magnitude = (dx * dx + dy * dy).sqrt();
+            let x = dy / magnitude as f32;
+            let y = dx / magnitude as f32;
+
+            // check that dx and dy are numbers
+            if x.is_nan() || y.is_nan() {
+                return;
+            }
+
+            // create xyz axis
+            let axis = Position::new(x, y, 0.0, 1.0);
+
+            // convert x and y displacement to an angle in degrees
+            let angle = (magnitude / 100.0) * 360.0  * 0.01;
+
+            // rotate the mesh based on the mouse position against the previous mouse position
+            self.cube.rotate(
+                angle,
+                axis
+            );
+
+            // println!("dx: {}, dy: {}, magnitude: {}, x: {}, y: {}, angle: {}", dx, dy, magnitude, x, y, angle);
+            // println!("Cube verts: {:?}", self.cube.mesh.vertices);
+
+            // recreate the vertex buffer
+            self.vertex_buffer = self.device.create_buffer_init(
+                &wgpu::util::BufferInitDescriptor {
+                    label: Some("Vertex Buffer"),
+                    contents: bytemuck::cast_slice(&self.cube.mesh.vertices),
+                    usage: wgpu::BufferUsages::VERTEX,
+                }
+            );
+        }
+
+        // update the previous mouse position
+        self.mouse_state.prev_mouse_position = current_mouse_pos;
     }
 
     pub fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
@@ -296,7 +381,9 @@ impl Graphics {
             });
 
             render_pass.set_pipeline(&self.render_pipeline); 
-            render_pass.draw(0..3, 0..1);
+            render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
+            render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
+            render_pass.draw_indexed(0..self.n_indices, 0, 0..1);
         }
 
         self.queue.submit(std::iter::once(encoder.finish()));
@@ -307,10 +394,10 @@ impl Graphics {
 }
 
 #[cfg_attr(target_arch="wasm32", wasm_bindgen(start))]
-pub async fn run() {
+pub async fn run(cube: Cube) -> Result<(), Box<dyn std::error::Error>> {
     let event_loop = EventLoop::new();
     let window = Graphics::new_window(&event_loop);
-    let mut graphics = Graphics::new(window).await;
+    let mut graphics = Graphics::new(window, cube).await;
 
     event_loop.run(move |event, _, control_flow| match event {
         Event::WindowEvent {
@@ -348,6 +435,7 @@ pub async fn run() {
                 Err(wgpu::SurfaceError::OutOfMemory) => *control_flow = ControlFlow::Exit,
                 Err(e) => eprintln!("{:?}", e),
             }
+            
         },
         Event::MainEventsCleared => {
             graphics.window.request_redraw();
